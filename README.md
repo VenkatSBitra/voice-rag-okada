@@ -12,6 +12,8 @@ The core problem is that valuable, proprietary information within an organizatio
 
 ![alt text](images/image-1.png)
 
+![alt text](images/image-3.png)
+
 Points to note:
 - The user asks a straightforward question about the number of listings at a specific address.
 - The system retrieves the relevant data from a structured database using Knowledge Graph RAG architecture.
