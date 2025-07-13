@@ -52,8 +52,9 @@ def query_real_estate_database(question: str):
     
     # Step 1: Internal Router - Classify the user's intent
     router_prompt = f"""
-    You are a classification model. Your task is to determine if the following user question is asking about a specific street address or is a general query.
-    Answer with only 'ADDRESS_SEARCH' or 'GENERAL_QUERY'.
+    You are a classification model. Your task is to determine if the following user question is asking about a specific street address or is a general query requiring a database search or if it just normal conversational context like Hi, Hello, Thank You, or Goodbye.
+    Scale to questions unrelated to real estate to NORMAL_QUERY.
+    Answer with only 'ADDRESS_SEARCH' or 'GENERAL_QUERY' or 'NORMAL_QUERY'.
 
     Question: {question}
     Classification:
@@ -93,7 +94,7 @@ def query_real_estate_database(question: str):
             return result_df.to_markdown(index=False)
 
         # --- Branch 2: The question is a general query ---
-        else:
+        elif "GENERAL_QUERY" in router_response:
             print("Executing general query logic...")
             db_schema = get_db_schema(DB_PATH)
             cypher_gen_prompt = f"Schema: {db_schema}\nQuestion: {question}\nGenerate a Cypher query. Respond with only the query."
@@ -102,6 +103,13 @@ def query_real_estate_database(question: str):
             
             result = conn.execute(cypher_query)
             return result.get_as_df().to_markdown(index=False)
+        
+        # --- Branch 3: The question is a normal conversational context ---
+        elif "NORMAL_QUERY" in router_response:
+
+            result = logic_llm.invoke(f"{question}")
+            return result.content.strip()
+
 
     except Exception as e:
         return f"An error occurred within the tool: {e}"

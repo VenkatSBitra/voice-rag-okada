@@ -8,9 +8,11 @@ import openai
 from dotenv import load_dotenv
 import io
 from main_kuzu import app as kuzu_app  # Import the Kuzu app if needed
+from main import app as sqlite_app  # Import the sqlite app if needed
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
 from gtts import gTTS
 import base64
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
@@ -42,6 +44,8 @@ messages = [
 ]
 
 client = openai.OpenAI()
+
+llm = ChatOpenAI(model="gpt-4.1-mini-2025-04-14", temperature=0)  # Using a powerful model is good for following complex instructions
 
 # --- Pydantic Models for Data Validation ---
 
@@ -118,14 +122,27 @@ async def chat_with_llm(request: ChatRequest):
         elif msg['role'] == 'assistant':
             messages.append(AIMessage(content=msg['content']))
     try:
-        events = kuzu_app.stream({"messages": messages}, {'recursion_limit': 10})  # Call the Kuzu app if needed
-        for event in events:
+        kuzu_events = kuzu_app.stream({"messages": messages}, {'recursion_limit': 10})  # Call the Kuzu app if needed
+        for event in kuzu_events:
             if "agent" in event:
                 print(event["agent"]["messages"][-1])
             if "execute_tool" in event:
                 print(event["execute_tool"]["messages"][-1])
-        final_state = kuzu_app.invoke({"messages": messages})
-        response = final_state['messages'][-1].content if final_state['messages'] else "No response generated."
+        kuzu_final_state = kuzu_app.invoke({"messages": messages})
+        kuzu_response = kuzu_final_state['messages'][-1].content if kuzu_final_state['messages'] else "No response generated."
+
+        sqlite_events = sqlite_app.stream({"messages": messages}, {'recursion_limit': 10})  # Call the SQLite app if needed
+        for event in sqlite_events:
+            if "agent" in event:
+                print(event["agent"]["messages"][-1])
+            if "execute_tool" in event:
+                print(event["execute_tool"]["messages"][-1])
+        sqlite_final_state = sqlite_app.invoke({"messages": messages})
+        sqlite_response = sqlite_final_state['messages'][-1].content if sqlite_final_state['messages'] else "No response generated."
+        query = f'''Answer {request.new_message} using the following context generated from two models. Using Kuzu DB, the response is: {kuzu_response} and using SQLite DB, the response is: {sqlite_response}. Compile the answers and return a single response. '''
+
+        result = llm.invoke(messages + [HumanMessage(content=query)])
+        response = result.content.strip()
     except Exception as e:
         return {"response": f"Error occurred: {e}"}
     return {"response": response}
@@ -224,4 +241,4 @@ async def upload_rag_documents(files: List[UploadFile] = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

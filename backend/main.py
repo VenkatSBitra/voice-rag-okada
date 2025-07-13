@@ -74,7 +74,8 @@ def call_model(state: AgentState):
         "You are a helpful real estate data assistant. You have access to a SQLite database "
         "with the following schema:\n\n"
         f"{db_schema}\n\n"
-        "Given a user's question, you must first generate a syntactically correct SQL query "
+        "Given a user's question, first determine the intent and context. Then, see if there is any"
+        " need to use the SQL database. If so, you must first generate a syntactically correct SQL query "
         "to run against the database. Then, use the `run_sql` tool to execute it. "
         "Finally, use the result of the query to answer the user's question in plain English. "
         "If a query returns a large number of rows, summarize the result. "
@@ -115,32 +116,33 @@ def should_continue(state: AgentState):
     else:
         return END
 
+llm = ChatOpenAI(model="gpt-4.1-mini-2025-04-14", temperature=0)
+
+tools = [run_sql]
+llm_with_tools = llm.bind_tools(tools)
+
+graph = StateGraph(AgentState)
+graph.add_node("agent", call_model)
+graph.add_node("execute_tool", call_tool)
+
+graph.set_entry_point("agent")
+graph.add_conditional_edges(
+    "agent",
+    should_continue,
+    {
+        "execute_tool": "execute_tool",
+        END: END
+    }
+)
+graph.add_edge("execute_tool", "agent")
+
+app = graph.compile()
+
+
+print("\n--- Agent Initialized. Ready for questions. ---\n")
+
 if __name__ == '__main__':
-    llm = ChatOpenAI(model="gpt-4.1-mini-2025-04-14", temperature=0)
-
-    tools = [run_sql]
-    llm_with_tools = llm.bind_tools(tools)
-
-    graph = StateGraph(AgentState)
-    graph.add_node("agent", call_model)
-    graph.add_node("execute_tool", call_tool)
-
-    graph.set_entry_point("agent")
-    graph.add_conditional_edges(
-        "agent",
-        should_continue,
-        {
-            "execute_tool": "execute_tool",
-            END: END
-        }
-    )
-    graph.add_edge("execute_tool", "agent")
-
-    app = graph.compile()
-
     # --- Let's ask some questions! ---
-    print("\n--- Agent Initialized. Ready for questions. ---\n")
-    
     questions = [
         "How many listings are there?",
         "What are the details for the largest suite by square footage?",

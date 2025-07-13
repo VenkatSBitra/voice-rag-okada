@@ -73,8 +73,8 @@ export default function App() {
     const chatEndRef = useRef(null);
 
     // --- API Configuration ---
-    // const API_BASE_URL = "http://127.0.0.1:8000";
-    const API_BASE_URL = "http://192.168.1.171:8000";
+    const API_BASE_URL = "http://127.0.0.1:8000";
+    // const API_BASE_URL = "http://192.168.1.171:8000";
     const TRANSCRIBE_URL = `${API_BASE_URL}/transcribe`;
     const CHAT_URL = `${API_BASE_URL}/chat`;
     const SPEAK_URL = `${API_BASE_URL}/speak`;
